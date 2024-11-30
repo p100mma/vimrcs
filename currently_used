@@ -1,0 +1,154 @@
+" some shortcuts I should use more often
+" gg go to top of file
+" daw, diw, da(, ca<, ci< etc. means (d)eleting or (c)hanging (a)round  or (i)nside a (w)ord
+" or a set of paretnheses (, < or " etc.
+
+" regex synthax i forget
+" a? zero or more of previous character
+" [abcd24] any element of the set inside brackets
+" [^abcd34] any character but element of the set inside brackets
+" \s any whitespace
+"  a{4} repeat previous character exactly 4 times 
+"  a{2,8} repeat previous character exactly 2,3... or 8 times
+" a{3,} repeat previous character 3 or more times
+
+
+"options
+let &number = 1
+let &shiftround = 1
+let &shiftwidth = 1
+let &showmatch = 1
+
+let mapleader =","
+let maplocalleader =","
+set hlsearch
+"mappings
+" navigate (open) files
+nnoremap <leader>bn :bnext<cr>
+nnoremap <leader>bp :bprevious<cr>
+
+" show oppened files and set up a command for choice of the file to jump to
+nnoremap <leader>bl :ls<cr>:b<Space>
+
+" stop highlighting results from last search
+nnoremap <leader>nh :nohlsearch<cr>
+
+"quickly eddit vimrc
+nnoremap <leader>ev :vsplit $MYVIMRC<cr>
+nnoremap <leader>sv :source $MYVIMRC<cr>
+"move one line down
+noremap <leader>- ddp
+"move one line up
+noremap <leader>_ ddkkp
+
+"set current word to upper case (insert mode")
+inoremap <leader><c-u> <esc>viwU<esc>i
+"set current word to upper case normal mode
+nnoremap <leader><c-u> viwU
+"wrap word with quotes
+nnoremap <leader>aw" viw<esc>a"<esc>bi"<esc>lel
+
+" highlight as "error" the trailing whitespaces 
+" because of special meaning of <cr> in map
+" <lt> is used instead of < at the end
+nnoremap <leader>w :execute "normal! :match Error " . '/\v\s+$/' . "\<lt>cr>"<cr>
+nnoremap <leader>W :match none Error<cr>
+" add \very magic vim symbol before each search
+nnoremap / /\v
+
+" correct typos
+iabbrev fuction function
+iabbrev fnction function
+iabbrev fnuction function
+
+" common words abbrevs
+iabbrev lbry library
+
+
+
+" local filetype options
+
+" vimscript local settings ------------ {{{ 
+augroup filetype_vim
+    autocmd!
+    autocmd FileType vim setlocal foldmethod=marker
+augroup END
+" }}}
+
+" python local settings ------------ {{{
+augroup ftype_python
+autocmd!
+autocmd FileType python setlocal nowrap 
+augroup END
+" }}}
+
+" R local settings ------------ {{{
+augroup ftype_r
+autocmd!
+autocmd FileType r iabbrev <buffer> fndef <-function()<left>
+augroup END
+" }}}
+
+" remote.R local settings ------------ {{{
+
+" find a pattern that marks beggining of the cell
+" move a cursor there
+function! FindCellHeader()
+	execute "normal! ?" . '\v^#```\{r\}$' . "\<cr>"
+endfunction
+
+" analogous
+function! FindCellEnd()
+	execute "normal! /" . '\v^#```$' . "\<cr>"
+endfunction
+
+" save current cell to Cell.R
+function! SaveCell()
+	call FindCellHeader()
+	" start visual line selection
+	execute "normal! \<s-v>"	
+	call FindCellEnd()
+	" yank last selected region (gv) to register a
+	silent! normal! gv"ay
+ 	" save reg a to variable
+	let s_text = @a
+	" redirect echo of variable to Cell.R
+	redir! > Cell.R | echo s_text | redir END
+endfunction
+
+" get remote ssh destination from the 2nd line
+" this is the tex after 'destination=' string
+" additional register shuffling ensures
+" previous yanked value gets perserved
+function! GetRemoteDestination()
+	execute "normal! mj"
+	let backup_reg = @"
+	let breg_type = getregtype('"')
+	execute "normal! :2\<cr>f=ly$"
+	let dest = @"
+	call setreg('"', backup_reg, breg_type)
+	execute "normal! `j"
+	return dest
+endfunction
+
+" copy the contents of Cell.R to the remote destination
+function! CopyCellToRemote()
+	let remote = GetRemoteDestination()
+	execute "normal! " . ":!scp Cell.R " . remote . " \<cr>"
+endfunction
+
+augroup ftype_remote_r
+autocmd!
+" upon creating new file, add the header line for the remote destination specification
+autocmd BufNewFile *remote.R execute "normal! i" . "#---\<cr>#destination=\<cr>#---" . "\<cr>\<cr>#```{r}\<cr>\<cr>#```\<esc>k" 
+autocmd BufRead,BufNewFile *remote.R set nowrapscan
+autocmd BufRead,BufNewFile *remote.R set nohlsearch
+" open a new cell below
+autocmd BufRead,BufNewFile *remote.R nnoremap <buffer> <leader>b :execute "normal! /" . '\v^#```$' . "\<lt>cr>"<cr>o<esc>o<esc>o#```{r}<esc>o<cr>#```<esc>k
+" save code of the cell to Cell.R
+autocmd BufRead,BufNewFile *remote.R nnoremap <buffer> <leader><cr> :execute "normal! ?" . '\v^#```\{r\}$' . "\<lt>cr>"<cr><s-v>/\v^#```<cr>:w! Cell.R<cr>
+"autocmd BufRead,BufNewFile *remote.R nnoremap <buffer> <leader><cr> :call SaveCell() 
+augroup END
+
+
+" }}}
